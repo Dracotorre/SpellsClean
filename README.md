@@ -1,6 +1,8 @@
 # SpellsClean
 Spells Clean for Skyrim SE
 
+Remove rarely used configuration spells from character to reduce clutter in spells lists.
+
 documention at [www.dracotorre.com/mods/spellsclean](http://www.dracotorre.com/mods/spellsclean/)
 
 PC download at [www.nexusmods.com/skyrimspecialedition/mods/14776](https://www.nexusmods.com/skyrimspecialedition/mods/14776)
