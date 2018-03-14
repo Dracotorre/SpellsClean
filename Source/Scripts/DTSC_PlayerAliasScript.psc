@@ -90,34 +90,38 @@ EndEvent
 Event OnUpdate()
 
 	; only process after Helgen and ready to play
-	if (MQ101Quest.IsCompleted() && Game.IsFightingControlsEnabled())
-		
-		; only process if enabled or restoring
-		if (DTSC_DisableAll.GetValue() <= 0.0)
-			int doRestore = DTSC_RestoreAllSpells.GetValueInt()
-			
-			; always restore
-			if (DTSC_DisableSetting.GetValue() < 1 || doRestore > 0 || CleanTaskOption == 2)
-				CleanSpells()
-			endIf
-			
-			if (CleanTaskOption == 2 && doRestore < 1)
-			
-				; remove spells on next update
-				CleanTaskOption = 1
-				float waitSecs = DTSC_WaitSecondsSetting.GetValue()
-				if (waitSecs > 300.0 || waitSecs <= 0.0)
-					waitSecs = DTSC_WaitSecondsToCheck.GetValue()
-				endIf
-				if (waitSecs < 8.0)
-					waitSecs = 8.0
+	if (MQ101Quest.IsCompleted())
+		if (Game.IsFightingControlsEnabled())
+			; only process if enabled or restoring
+			if (DTSC_DisableAll.GetValue() <= 0.0)
+				int doRestore = DTSC_RestoreAllSpells.GetValueInt()
+				
+				; always restore
+				if (DTSC_DisableSetting.GetValue() < 1 || doRestore > 0 || CleanTaskOption == 2)
+					CleanSpells()
 				endIf
 				
-				ActivateConfig()
-				RegisterForSingleUpdate(waitSecs)
+				if (CleanTaskOption == 2 && doRestore < 1)
+				
+					; remove spells on next update
+					CleanTaskOption = 1
+					float waitSecs = DTSC_WaitSecondsSetting.GetValue()
+					if (waitSecs > 300.0 || waitSecs <= 0.0)
+						waitSecs = DTSC_WaitSecondsToCheck.GetValue()
+					endIf
+					if (waitSecs < 8.0)
+						waitSecs = 8.0
+					endIf
+					
+					ActivateConfig()
+					RegisterForSingleUpdate(waitSecs)
+				endIf
 			endIf
+		else
+			; no fight controls - try later
+			RegisterForSingleUpdate(12.0)
 		endIf
-		; else wait for next game load
+		; else in MQ101 - wait for next game load 
 	endIf
 EndEvent
 
