@@ -127,14 +127,20 @@ EndEvent
 
 ; use to capture custom spells and armors 
 Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
+	if (akBaseObject && akBaseObject as Spell && akBaseObject == DTSC_ConfigSpell)
+		return
+	endIf
 	float captureTime = DTSC_CaptureSpellAdd.GetValue()
 	; wait a fraction to ensure timing else certain spells get missed -v2.06
 	Utility.Wait(0.1)
 	
 	if (akBaseObject && captureTime > 0.0)
+		
 		float curTime = Utility.GetCurrentGameTime()
 		float minDiff = DTSC_CommonF.GetGameTimeHoursDifference(curTime, captureTime) * 60.0
-		if (minDiff < 0.33)
+		;Debug.Trace("[DTSC] minDiff " + minDiff)
+		; v2.08 added more time allowance to 1.67 game-minutes / 5 seconds real-time
+		if (minDiff < 1.67)
 			if (DTSC_ExtraExceptionList.HasForm(akBaseObject))
 				if (DTSC_VerboseSetting.GetValueInt() > 0)
 					Utility.Wait(0.25)
@@ -146,6 +152,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 			
 			if (akBaseObject as Spell)
 				AddCustomSpell(akBaseObject)
+				;Debug.Trace("[DTSC] added  " + akBaseObject)
 				DTSC_CaptureSpellAdd.SetValue(0.0)
 			elseIf (akBaseObject as Armor)
 				if (AddCustomArmor(akBaseObject) > 0)

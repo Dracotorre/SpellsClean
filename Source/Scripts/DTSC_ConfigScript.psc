@@ -111,7 +111,9 @@ Function Menu(int aiMessage = 0, int aiButton = 0, bool abMenu = true)
 			if (diButton == 0)
 				DTSC_CaptureSpellAdd.SetValue(0.0)
 			elseIf (diButton == 1)
-				DTSC_CaptureSpellAdd.SetValue(Utility.GetCurrentGameTime())
+				float capTime = Utility.GetCurrentGameTime()  ; v2.08
+				;Debug.Trace("[DTSC] menu AddSpell capTime: " + capTime)
+				DTSC_CaptureSpellAdd.SetValue(capTime)
 				HideOnExit = false
 				abMenu = false
 			elseIf (diButton == 2)
