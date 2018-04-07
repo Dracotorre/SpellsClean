@@ -23,6 +23,7 @@ GlobalVariable property DTSC_RecheckModsSetting auto
 GlobalVariable property DTSC_VerboseSetting auto
 GlobalVariable property DTSC_CampFrostExtras auto    ; not currently used
 GlobalVariable property DTSC_WLToggleSettings auto
+GlobalVariable property DTSC_iNeedSetting auto
 GlobalVariable property DTSC_IncludeItemsSetting auto
 GlobalVariable property DTSC_WaitSecondsSetting auto
 GlobalVariable property DTSC_CaptureSpellAdd auto
@@ -38,6 +39,7 @@ bool property HideOnExit auto hidden
 Event OnEffectStart(Actor akTarget, Actor akCaster)
 	;Debug.Trace("[DTSC] OnEffectStart")
 	if (akCaster == PlayerREF)
+		DTSC_CaptureSpellAdd.SetValue(0.0)
 		HideOnExit = true
 		Menu()
 	endIf
@@ -87,8 +89,12 @@ Function Menu(int aiMessage = 0, int aiButton = 0, bool abMenu = true)
 			elseIf (biButton == 2)
 				DTSC_WLToggleSettings.SetValueInt(0)
 			elseIf (biButton == 3)
-				DTSC_IncludeItemsSetting.SetValueInt(1)
+				DTSC_iNeedSetting.SetValueInt(1)
 			elseIf (biButton == 4)
+				DTSC_iNeedSetting.SetValueInt(0)
+			elseIf (biButton == 5)
+				DTSC_IncludeItemsSetting.SetValueInt(1)
+			elseIf (biButton == 6)
 				DTSC_IncludeItemsSetting.SetValueInt(0)
 			endIf
 		elseIf (aiMessage == 2)

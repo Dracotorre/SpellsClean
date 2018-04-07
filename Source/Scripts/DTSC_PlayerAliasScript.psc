@@ -51,6 +51,7 @@ GlobalVariable property DTSC_DisableSetting auto
 GlobalVariable property DTSC_IncludeItemsSetting auto
 GlobalVariable property DTSC_MCMSetting auto
 GlobalVariable property DTSC_WLToggleSetting auto
+GlobalVariable property DTSC_iNeedSetting auto
 GlobalVariable property DTSC_CampFrostExtras auto
 GlobalVariable property DTSC_WaitSecondsSetting auto
 
@@ -74,6 +75,8 @@ GlobalVariable property DTSC_NATSet auto
 
 int property CleanTaskOption auto hidden
 {2 = restore, 1 = remove}
+
+int captureCount = 0  ;v2.10
 
 ; ************************** Events *******************
 
@@ -131,39 +134,40 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 		return
 	endIf
 	float captureTime = DTSC_CaptureSpellAdd.GetValue()
-	; wait a fraction to ensure timing else certain spells get missed -v2.06
-	Utility.Wait(0.1)
+	; wait a fraction to ensure timing -v2.06
+	Utility.WaitMenuMode(0.2)  ;v2.10 changed from Wait to menu-mode so don't need to close menu
 	
 	if (akBaseObject && captureTime > 0.0)
 		
 		float curTime = Utility.GetCurrentGameTime()
 		float minDiff = DTSC_CommonF.GetGameTimeHoursDifference(curTime, captureTime) * 60.0
 		;Debug.Trace("[DTSC] minDiff " + minDiff)
-		; v2.08 added more time allowance to 1.67 game-minutes / 5 seconds real-time
-		if (minDiff < 1.67)
+		; v2.08 added more time allowance (pauses in menu) - 1.67 minutes game-time is 5 seconds real-time
+		if (minDiff < 1.667 && captureCount < 3)
 			if (DTSC_ExtraExceptionList.HasForm(akBaseObject))
 				if (DTSC_VerboseSetting.GetValueInt() > 0)
-					Utility.Wait(0.25)
+					Utility.WaitMenuMode(0.25)    ; v2.10
 					DTSC_CustomExceptionMsg.Show()
 				endIf
-				DTSC_CaptureSpellAdd.SetValue(0.0)
 				return
 			endIf
 			
 			if (akBaseObject as Spell)
 				AddCustomSpell(akBaseObject)
 				;Debug.Trace("[DTSC] added  " + akBaseObject)
-				DTSC_CaptureSpellAdd.SetValue(0.0)
 			elseIf (akBaseObject as Armor)
 				if (AddCustomArmor(akBaseObject) > 0)
-					DTSC_CaptureSpellAdd.SetValue(0.0)
 					if (DTSC_HasItemsMod.GetValueInt() < 1)
 						DTSC_IncludeItemsSetting.SetValueInt(1)
 					endIf
 				endIf
 			endIf
-		endIf
-		
+		else
+			DTSC_CaptureSpellAdd.SetValue(0.0)
+			captureCount = 0
+		endIf	
+	else
+		captureCount = 0
 	endIf
 endEvent
 
@@ -184,13 +188,15 @@ int Function AddCustomArmor(Form baseArmor)
 	if (baseArmor.HasKeyword(ClothingRingKY) || baseArmor.HasKeyword(ArmorJewelryKY))
 		
 		if (!DTSC_ArmorsExtraList.HasForm(baseArmor))
-			if (DTSC_VerboseSetting.GetValueInt() > 0)
-				Utility.Wait(0.333)
-				DTSC_CustomArmorAddedMsg.Show()
-			endIf
+			captureCount += 1
 			DTSC_ArmorsExtraList.AddForm(baseArmor)
 			DTSC_HasItemsCustom.SetValueInt(DTSC_ArmorsExtraList.GetSize())
+			if (DTSC_VerboseSetting.GetValueInt() > 0)
+				Utility.WaitMenuMode(0.2)   ;v2.10 replaced Wait
+				DTSC_CustomArmorAddedMsg.Show(captureCount)
+			endIf
 		elseIf (DTSC_VerboseSetting.GetValueInt() > 0)
+			Utility.WaitMenuMode(0.2)
 			DTSC_CustomExistsMsg.Show()
 		endIf
 		return 1
@@ -201,12 +207,14 @@ endFunction
 int Function AddCustomSpell(Form baseSpell)
 	
 	if (!DTSC_SpellsExtraList.HasForm(baseSpell))
-		if (DTSC_VerboseSetting.GetValueInt() > 0)
-			Utility.Wait(0.333)
-			DTSC_CustomSpellAddedMsg.Show()
-		endIf
+		captureCount += 1
 		DTSC_SpellsExtraList.AddForm(baseSpell)
+		if (DTSC_VerboseSetting.GetValueInt() > 0)
+			Utility.WaitMenuMode(0.2) ;v2.10 replaced Wait
+			DTSC_CustomSpellAddedMsg.Show(captureCount)
+		endIf
 	elseIf (DTSC_VerboseSetting.GetValueInt() > 0)
+		Utility.WaitMenuMode(0.1)
 		DTSC_CustomExistsMsg.Show()
 	endIf
 	return 1
@@ -261,17 +269,42 @@ Function CleanSpells()
 		if (sp)
 			modCount += 1
 			cleanSpellsCount += ProcessTaskForSpell(taskOption, sp)
+			DTSC_WearableLantConfig.SetValue(1.0)
+			
 			if (DTSC_WLToggleSetting.GetValueInt() > 0 || restoreAll)
 				sp = Game.GetFormFromFile(0x06020A40, pluginName) as Spell  ; toggle lantern
 				cleanSpellsCount += ProcessTaskForSpell(taskOption, sp)
 				sp = Game.GetFormFromFile(0x06020A42, pluginName) as Spell  ; check fuel
 				cleanSpellsCount += ProcessTaskForSpell(taskOption, sp)
-
-				DTSC_WearableLantConfig.SetValue(1.0)
 			endIf
 			Utility.Wait(0.1)
 		else
 			DTSC_WearableLantConfig.SetValue(0.0)
+		endIf
+	endIf
+	
+	taskOption = DTSC_iNeedAction.GetValueInt()
+	if (taskOption > 0 || ignoreDisabled)
+		if (restoreAll)
+			taskOption = 2
+		elseIf (ignoreDisabled)
+			taskOption = 1
+		endIf
+		int iNeedSetting = DTSC_iNeedSetting.GetValueInt()
+		if (iNeedSetting != 0 || restoreAll)
+			Spell actionSpell = IsPluginPresent(0x09056CC4, "iNeed.esp") as Spell
+			if (actionSpell)
+				modCount += 1
+				cleanSpellsCount += ProcessTaskForSpell(taskOption, actionSpell)
+				DTSC_iNeedAction.SetValue(1.0)
+			else
+				DTSC_iNeedAction.SetValue(0.0)
+			endIf
+			if (iNeedSetting < 0)
+				DTSC_iNeedSetting.SetValueInt(0)
+			endIf
+		elseIf (DTSC_iNeedAction.GetValueInt() >= 1)
+			modCount += 1
 		endIf
 	endIf
 	Utility.Wait(0.2)
@@ -294,8 +327,6 @@ Function CleanSpells()
 	cleanSpellsCount += HandleSpellForMod(0x0905FD94, "Better Vampires.esp", DTSC_BetterVampConfig, restoreAll, ignoreDisabled)
 
 	cleanSpellsCount += HandleSpellForMod(0x090DBDAA, "WetandCold.esp", DTSC_WetAndColdConfig, restoreAll, ignoreDisabled)
-	
-	cleanSpellsCount += HandleSpellForMod(0x09056CC4, "iNeed.esp",  DTSC_iNeedAction, restoreAll, ignoreDisabled)
 	
 	cleanSpellsCount += HandleSpellForMod(0x0906CE7E, "Wildcat - Combat of Skyrim.esp", DTSC_WildcatConfig, restoreAll, ignoreDisabled)
 	
@@ -508,6 +539,9 @@ Function ManageMod()
 		endIf
 		if (oldV > 1.0 && oldV < 2.03)
 			DTSC_InitOptions.SetValueInt(1)
+		endIf
+		if (oldV > 1.0 && DTSC_iNeedAction.GetValueInt() > 0)
+			DTSC_iNeedSetting.SetValueInt(0)
 		endIf
 		DTSC_VersionPrior.SetValue(vers)
 	endIf
