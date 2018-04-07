@@ -77,6 +77,7 @@ int property CleanTaskOption auto hidden
 {2 = restore, 1 = remove}
 
 int captureCount = 0  ;v2.10
+float lastCaptureTime = 0.0
 
 ; ************************** Events *******************
 
@@ -138,9 +139,13 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 	Utility.WaitMenuMode(0.2)  ;v2.10 changed from Wait to menu-mode so don't need to close menu
 	
 	if (akBaseObject && captureTime > 0.0)
-		
+		if (captureTime > lastCaptureTime)
+			captureCount = 0
+			lastCaptureTime = captureTime
+		endIf
 		float curTime = Utility.GetCurrentGameTime()
 		float minDiff = DTSC_CommonF.GetGameTimeHoursDifference(curTime, captureTime) * 60.0
+		
 		;Debug.Trace("[DTSC] minDiff " + minDiff)
 		; v2.08 added more time allowance (pauses in menu) - 1.67 minutes game-time is 5 seconds real-time
 		if (minDiff < 1.667 && captureCount < 3)
