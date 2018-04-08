@@ -549,7 +549,7 @@ Function ManageMod()
 		if (oldV > 1.0 && oldV < 2.03)
 			DTSC_InitOptions.SetValueInt(1)
 		endIf
-		if (oldV > 1.0 && DTSC_iNeedAction.GetValueInt() > 0)
+		if (oldV > 1.0 && DTSC_iNeedAction.GetValueInt() > 0 && DTSC_iNeedSetting.GetValueInt() < 0)
 			DTSC_iNeedSetting.SetValueInt(0)
 		endIf
 		DTSC_VersionPrior.SetValue(vers)
