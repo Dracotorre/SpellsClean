@@ -78,6 +78,7 @@ int property CleanTaskOption auto hidden
 
 int captureCount = 0  ;v2.10
 float lastCaptureTime = 0.0
+float lastSpellAddedTime = 0.0  ;v2.25 for equip too fast such as auto-equip other hand
 
 ; ************************** Events *******************
 
@@ -93,39 +94,35 @@ EndEvent
 
 Event OnUpdate()
 
-	; only process after Helgen and ready to play
-	if (MQ101Quest.IsCompleted())
-		if (Game.IsFightingControlsEnabled())
-			; only process if enabled or restoring
-			if (DTSC_DisableAll.GetValue() <= 0.0)
-				int doRestore = DTSC_RestoreAllSpells.GetValueInt()
-				
-				; always restore
-				if (DTSC_DisableSetting.GetValue() < 1 || doRestore > 0 || CleanTaskOption == 2)
-					CleanSpells()
-				endIf
-				
-				if (CleanTaskOption == 2 && doRestore < 1)
-				
-					; remove spells on next update
-					CleanTaskOption = 1
-					float waitSecs = DTSC_WaitSecondsSetting.GetValue()
-					if (waitSecs > 300.0 || waitSecs <= 0.0)
-						waitSecs = DTSC_WaitSecondsToCheck.GetValue()
-					endIf
-					if (waitSecs < 8.0)
-						waitSecs = 8.0
-					endIf
-					
-					ActivateConfig()
-					RegisterForSingleUpdate(waitSecs)
-				endIf
+	if (Game.IsFightingControlsEnabled())
+		; only process if enabled or restoring
+		if (DTSC_DisableAll.GetValue() <= 0.0)
+			int doRestore = DTSC_RestoreAllSpells.GetValueInt()
+			
+			; always restore
+			if (DTSC_DisableSetting.GetValue() < 1 || doRestore > 0 || CleanTaskOption == 2)
+				CleanSpells()
 			endIf
-		else
-			; no fight controls - try later
-			RegisterForSingleUpdate(12.0)
+			
+			if (CleanTaskOption == 2 && doRestore < 1)
+			
+				; remove spells on next update
+				CleanTaskOption = 1
+				float waitSecs = DTSC_WaitSecondsSetting.GetValue()
+				if (waitSecs > 300.0 || waitSecs <= 0.0)
+					waitSecs = DTSC_WaitSecondsToCheck.GetValue()
+				endIf
+				if (waitSecs < 8.0)
+					waitSecs = 8.0
+				endIf
+				
+				ActivateConfig()
+				RegisterForSingleUpdate(waitSecs)
+			endIf
 		endIf
-		; else in MQ101 - wait for next game load 
+	else
+		; no fight controls - try later
+		RegisterForSingleUpdate(12.0)
 	endIf
 EndEvent
 
@@ -136,7 +133,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 	endIf
 	float captureTime = DTSC_CaptureSpellAdd.GetValue()
 	; wait a fraction to ensure timing -v2.06
-	Utility.WaitMenuMode(0.2)  ;v2.10 changed from Wait to menu-mode so don't need to close menu
+	Utility.WaitMenuMode(0.4)  ;v2.10 changed from Wait to menu-mode so don't need to close menu
 	
 	if (akBaseObject && captureTime > 0.0)
 		if (captureTime > lastCaptureTime)
@@ -144,6 +141,13 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 			lastCaptureTime = captureTime
 		endIf
 		float curTime = Utility.GetCurrentGameTime()
+		float secSinceLastAdd = DTSC_CommonF.GetGameTimeHoursDifference(curTime, lastSpellAddedTime) * 3600.0
+		lastSpellAddedTime = curTime
+		if (secSinceLastAdd < 0.50)
+			; v2.25
+			;Debug.Trace("[DTSC] equip too fast")
+			return
+		endIf
 		float minDiff = DTSC_CommonF.GetGameTimeHoursDifference(curTime, captureTime) * 60.0
 		
 		;Debug.Trace("[DTSC] minDiff " + minDiff)
@@ -159,7 +163,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 			
 			if (akBaseObject as Spell)
 				AddCustomSpell(akBaseObject)
-				;Debug.Trace("[DTSC] added  " + akBaseObject)
+				
 			elseIf (akBaseObject as Armor)
 				if (AddCustomArmor(akBaseObject) > 0)
 					if (DTSC_HasItemsMod.GetValueInt() < 1)
@@ -210,10 +214,10 @@ int Function AddCustomArmor(Form baseArmor)
 endFunction
 
 int Function AddCustomSpell(Form baseSpell)
-	
 	if (!DTSC_SpellsExtraList.HasForm(baseSpell))
 		captureCount += 1
 		DTSC_SpellsExtraList.AddForm(baseSpell)
+		Debug.Trace("[DTSC] added  " + baseSpell + ", count: " + captureCount)
 		if (DTSC_VerboseSetting.GetValueInt() > 0)
 			Utility.WaitMenuMode(0.2) ;v2.10 replaced Wait
 			DTSC_CustomSpellAddedMsg.Show(captureCount)
