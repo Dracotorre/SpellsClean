@@ -140,14 +140,17 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 			captureCount = 0
 			lastCaptureTime = captureTime
 		endIf
-		float curTime = Utility.GetCurrentGameTime()
-		float secSinceLastAdd = DTSC_CommonF.GetGameTimeHoursDifference(curTime, lastSpellAddedTime) * 3600.0
-		lastSpellAddedTime = curTime
-		if (secSinceLastAdd < 0.50)
+		
+		float curRealTime = Utility.GetCurrentRealTime()
+		float secSinceLastAdd = curRealTime - lastSpellAddedTime
+		lastSpellAddedTime = curRealTime
+		if (secSinceLastAdd < 0.33)
 			; v2.25
 			;Debug.Trace("[DTSC] equip too fast")
 			return
 		endIf
+		
+		float curTime = Utility.GetCurrentGameTime()
 		float minDiff = DTSC_CommonF.GetGameTimeHoursDifference(curTime, captureTime) * 60.0
 		
 		;Debug.Trace("[DTSC] minDiff " + minDiff)
@@ -549,9 +552,12 @@ Function ManageMod()
 		if (oldV > 1.0 && oldV < 2.03)
 			DTSC_InitOptions.SetValueInt(1)
 		endIf
-		if (oldV > 1.0 && DTSC_iNeedAction.GetValueInt() > 0 && DTSC_iNeedSetting.GetValueInt() < 0)
+		if (oldV > 1.0 && oldV < 2.20 && DTSC_iNeedAction.GetValueInt() > 0 && DTSC_iNeedSetting.GetValueInt() < 0)
 			DTSC_iNeedSetting.SetValueInt(0)
 		endIf
+
+		lastCaptureTime = Utility.GetCurrentRealTime()
+
 		DTSC_VersionPrior.SetValue(vers)
 	endIf
 endFunction
