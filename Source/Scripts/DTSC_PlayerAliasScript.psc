@@ -24,6 +24,7 @@ Message property DTSC_CustomExceptionMsg auto
 Message property DTSC_CustomExistsMsg auto
 Message property DTSC_CustomArmorAddedMsg auto
 Message property DTSC_InitMessage auto
+Message property DTSC_ConfirmRemoveMsg auto
 Spell property DTSC_ConfigSpell auto
 GlobalVariable property DTSC_HasItemsMod auto
 GlobalVariable property DTSC_CaptureSpellAdd auto
@@ -43,6 +44,7 @@ GlobalVariable property DTSC_VersionPrior auto
 GlobalVariable property DTSC_Verbose auto
 GlobalVariable property DTSC_WearableLantToggles auto ; now use WL setting
 GlobalVariable property DTSC_IsXB1 auto  ; skip if Xbox
+GlobalVariable property DTSC_CaptureLimit auto
 
 ; settings
 GlobalVariable property DTSC_VerboseSetting auto
@@ -76,9 +78,10 @@ GlobalVariable property DTSC_NATSet auto
 int property CleanTaskOption auto hidden
 {2 = restore, 1 = remove}
 
+bool recheckExclusions = false  ; v2.30 - in case more exclusions have been added in update
 int captureCount = 0  ;v2.10
-float lastCaptureTime = 0.0
-float lastSpellAddedTime = 0.0  ;v2.25 for equip too fast such as auto-equip other hand
+float lastCaptureTime = 0.0     ; game-time
+float lastSpellAddedTime = 0.0  ;v2.25 real-tikme for equip too fast such as auto-equip other hand
 
 ; ************************** Events *******************
 
@@ -155,7 +158,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 		
 		;Debug.Trace("[DTSC] minDiff " + minDiff)
 		; v2.08 added more time allowance (pauses in menu) - 1.67 minutes game-time is 5 seconds real-time
-		if (minDiff < 1.667 && captureCount < 3)
+		if (minDiff < 1.667 && captureCount < DTSC_CaptureLimit.GetValueInt())
 			if (DTSC_ExtraExceptionList.HasForm(akBaseObject))
 				if (DTSC_VerboseSetting.GetValueInt() > 0)
 					Utility.WaitMenuMode(0.25)    ; v2.10
@@ -209,7 +212,8 @@ int Function AddCustomArmor(Form baseArmor)
 			endIf
 		elseIf (DTSC_VerboseSetting.GetValueInt() > 0)
 			Utility.WaitMenuMode(0.2)
-			DTSC_CustomExistsMsg.Show()
+			;DTSC_CustomExistsMsg.Show()
+			ConfirmRemoveMenu(DTSC_ArmorsExtraList, baseArmor)
 		endIf
 		return 1
 	endIf
@@ -220,16 +224,33 @@ int Function AddCustomSpell(Form baseSpell)
 	if (!DTSC_SpellsExtraList.HasForm(baseSpell))
 		captureCount += 1
 		DTSC_SpellsExtraList.AddForm(baseSpell)
-		Debug.Trace("[DTSC] added  " + baseSpell + ", count: " + captureCount)
+		;Debug.Trace("[DTSC] added  " + baseSpell + ", count: " + captureCount)
 		if (DTSC_VerboseSetting.GetValueInt() > 0)
 			Utility.WaitMenuMode(0.2) ;v2.10 replaced Wait
 			DTSC_CustomSpellAddedMsg.Show(captureCount)
 		endIf
 	elseIf (DTSC_VerboseSetting.GetValueInt() > 0)
 		Utility.WaitMenuMode(0.1)
-		DTSC_CustomExistsMsg.Show()
+		;DTSC_CustomExistsMsg.Show()
+		ConfirmRemoveMenu(DTSC_SpellsExtraList, baseSpell)
 	endIf
 	return 1
+endFunction
+
+; v2.30 - checks and removes exclusions from aList - items should be restored first
+Function CheckExclusionsForList(FormList aList)
+	if (aList)
+		int len = aList.GetSize()
+		int idx = len - 1
+		; go backward so we can remove keeping index
+		while (idx >= 0)
+			Form aForm = aList.GetAt(idx)
+			if (aForm && DTSC_ExtraExceptionList.HasForm(aForm))
+				aList.RemoveAddedForm(aForm)
+			endIf
+			idx -= 1
+		endWhile
+	endIf
 endFunction
 
 Function CleanSpells()
@@ -367,6 +388,12 @@ Function CleanSpells()
 	endIf
 	
 	int len = DTSC_SpellsExtraList.GetSize()
+	; v2.30 - added recheck exclusions to modify list on clean phase
+	if (recheckExclusions && !restoreAll && len > 0)
+		CheckExclusionsForList(DTSC_SpellsExtraList)
+		len = DTSC_SpellsExtraList.GetSize() ; update
+	endIf
+	
 	int idx = 0
 	while (idx < len)
 		Spell aSpell = DTSC_SpellsExtraList.GetAt(idx) as Spell
@@ -386,6 +413,12 @@ Function CleanSpells()
 		endIf
 		
 		len = DTSC_ArmorsExtraList.GetSize()
+		; v2.30 - recheck exclusions on update during clean phase
+		if (recheckExclusions && !restoreAll && len > 0)
+			CheckExclusionsForList(DTSC_ArmorsExtraList)
+			len = DTSC_ArmorsExtraList.GetSize()  ; update 
+		endIf
+		
 		idx = 0
 		while (idx < len)
 			Armor armItem = DTSC_ArmorsExtraList.GetAt(idx) as Armor
@@ -417,8 +450,9 @@ Function CleanSpells()
 				DTSC_CleanTotalMsg.Show(cleanSpellsCount, cleanItemsCount)
 			endIf
 		endIf
+		recheckExclusions = false
 	endIf
-
+	
 endFunction
 
 int Function CleanArmor(Armor armItm)
@@ -437,6 +471,16 @@ int Function CleanSpell(Spell sp)
 		return 1
 	endIf
 	return 0
+endFunction
+
+Function ConfirmRemoveMenu(FormList list, Form formToRemove, int aiButton = 0)
+	aiButton = DTSC_ConfirmRemoveMsg.Show() 
+	if aiButton == 0  
+		; no, do nothing
+	elseIf aiButton == 1
+		; yes, remove spell from clean list
+		list.RemoveAddedForm(formToRemove)
+	endIf
 endFunction
 
 ; set to 2 on startup
@@ -526,6 +570,8 @@ Function ManageMod()
 	float oldV = DTSC_VersionPrior.GetValue()
 	
 	if (oldV < vers)
+		recheckExclusions = true 
+		
 		if (oldV > 0.5 && oldV < 2.00)
 			DTSC_BetterVampConfig.SetValueInt(1)
 			DTSC_CampFrostOps.SetValueInt(1)

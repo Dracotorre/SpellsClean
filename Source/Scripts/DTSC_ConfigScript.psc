@@ -16,6 +16,7 @@ Message property DTSC_ConfigAddCustomSpellMsg auto
 ; to report on main menu
 GlobalVariable property DTSC_Version auto
 GlobalVariable property DTSC_ModMonCount auto
+GlobalVariable property DTSC_CaptureLimit auto
 
 ; settings to set
 GlobalVariable property DTSC_DisableSetting auto
@@ -111,7 +112,7 @@ Function Menu(int aiMessage = 0, int aiButton = 0, bool abMenu = true)
 				DTSC_WaitSecondsSetting.SetValueInt(234)
 			endIf
 		elseIf (aiMessage == 3)
-			int diButton = DTSC_ConfigAddCustomSpellMsg.Show(DTSC_SpellsExtraList.GetSize(), DTSC_ArmorsExtraList.GetSize())
+			int diButton = DTSC_ConfigAddCustomSpellMsg.Show(DTSC_CaptureLimit.GetValue(), DTSC_SpellsExtraList.GetSize(), DTSC_ArmorsExtraList.GetSize())
 			aiMessage = 0
 			
 			if (diButton == 0)
@@ -137,6 +138,7 @@ Function RecoverCustomArmors()
 	while (idx < len)
 		Armor aArm = DTSC_ArmorsExtraList.GetAt(idx) as Armor
 		DTSC_CommonF.RestoreArmor(aArm, PlayerREF)
+		Utility.WaitMenuMode(0.05)
 		idx += 1
 	endWhile
 	if (len > 0)
@@ -150,6 +152,7 @@ Function RecoverCustomSpells()
 	while (idx < len)
 		Spell aSpell = DTSC_SpellsExtraList.GetAt(idx) as Spell
 		DTSC_CommonF.RestoreSpell(aSpell, PlayerREF)
+		Utility.WaitMenuMode(0.05)
 		idx += 1
 	endWhile
 	if (len > 0)
