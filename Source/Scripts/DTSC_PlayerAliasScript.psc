@@ -25,6 +25,7 @@ Message property DTSC_CustomExistsMsg auto
 Message property DTSC_CustomArmorAddedMsg auto
 Message property DTSC_InitMessage auto
 Message property DTSC_ConfirmRemoveMsg auto
+Message property DTSC_EquipFailMsg auto
 Spell property DTSC_ConfigSpell auto
 GlobalVariable property DTSC_HasItemsMod auto
 GlobalVariable property DTSC_CaptureSpellAdd auto
@@ -81,13 +82,14 @@ int property CleanTaskOption auto hidden
 bool recheckExclusions = false  ; v2.30 - in case more exclusions have been added in update
 int captureCount = 0  ;v2.10
 float lastCaptureTime = 0.0     ; game-time
-float lastSpellAddedTime = 0.0  ;v2.25 real-tikme for equip too fast such as auto-equip other hand
+float lastSpellAddedTime = 0.0  ;v2.25 real-time for equip too fast such as auto-equip other hand
 
 ; ************************** Events *******************
 
 Event OnPlayerLoadGame()
 	UnregisterForUpdate()
 	ManageMod()
+	lastSpellAddedTime = 0.01  ; reset for launch - v2.32 fix for excluding first equip
 		
 	; first update restores all spells
 	CleanTaskOption = 2
@@ -137,19 +139,22 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 	float captureTime = DTSC_CaptureSpellAdd.GetValue()
 	; wait a fraction to ensure timing -v2.06
 	Utility.WaitMenuMode(0.4)  ;v2.10 changed from Wait to menu-mode so don't need to close menu
-	
+
 	if (akBaseObject && captureTime > 0.0)
 		if (captureTime > lastCaptureTime)
 			captureCount = 0
 			lastCaptureTime = captureTime
 		endIf
 		
-		float curRealTime = Utility.GetCurrentRealTime()
+		float curRealTime = Utility.GetCurrentRealTime()    ; time since game launch
 		float secSinceLastAdd = curRealTime - lastSpellAddedTime
 		lastSpellAddedTime = curRealTime
+		
 		if (secSinceLastAdd < 0.33)
 			; v2.25
 			;Debug.Trace("[DTSC] equip too fast")
+			Utility.WaitMenuMode(0.4)
+			DTSC_EquipFailMsg.Show()
 			return
 		endIf
 		
