@@ -2,6 +2,7 @@ Scriptname DTSC_KeepCleanScript extends Quest
 
 Quest property MQ101Quest auto
 ReferenceAlias property DTSC_PlayerAliasScriptP auto
+Message property DTSC_StartDelayMessage auto
 
 int property UpdateStep auto hidden
 
@@ -30,7 +31,9 @@ Event OnUpdate()
 			(DTSC_PlayerAliasScriptP as DTSC_PlayerAliasScript).ActivateConfig()
 			UpdateStep = 3
 		endIf
-		
+	
+	else
+		DTSC_StartDelayMessage.Show()
 	endIf
 	; else let the next OnPlayerLoadGame handle
 endEvent 
