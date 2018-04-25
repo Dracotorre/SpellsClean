@@ -18,20 +18,25 @@ Event OnInit()
 endEvent
 
 Event OnUpdate()
-	if (MQ101Quest.IsCompleted() && Game.IsFightingControlsEnabled())
-		if (UpdateStep == 1)
-			(DTSC_PlayerAliasScriptP as DTSC_PlayerAliasScript).ManageMod()
+	if (MQ101Quest.IsCompleted())
+		if (Game.IsFightingControlsEnabled())
+			if (UpdateStep == 1)
+				(DTSC_PlayerAliasScriptP as DTSC_PlayerAliasScript).ManageMod()
 
-			UpdateStep = 2
-			
+				UpdateStep = 2
+				
+				RegisterForSingleUpdate(3.0)
+			elseIf (UpdateStep == 2)
+				(DTSC_PlayerAliasScriptP as DTSC_PlayerAliasScript).CleanSpells()
+				Utility.Wait(0.5)
+				(DTSC_PlayerAliasScriptP as DTSC_PlayerAliasScript).ActivateConfig()
+				UpdateStep = 3
+			endIf
+		elseIf (UpdateStep > 1)
 			RegisterForSingleUpdate(3.0)
-		elseIf (UpdateStep == 2)
-			(DTSC_PlayerAliasScriptP as DTSC_PlayerAliasScript).CleanSpells()
-			Utility.Wait(0.5)
-			(DTSC_PlayerAliasScriptP as DTSC_PlayerAliasScript).ActivateConfig()
-			UpdateStep = 3
+		else
+			DTSC_StartDelayMessage.Show()
 		endIf
-	
 	else
 		DTSC_StartDelayMessage.Show()
 	endIf
