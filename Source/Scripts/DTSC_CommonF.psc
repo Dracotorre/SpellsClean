@@ -21,6 +21,14 @@ int Function RestoreArmor(Armor armItm, Actor actorRef) global
 	return 0
 endFunction
 
+int Function RestoreBook(Book item, Actor actorRef) global
+	if (item && actorRef.GetItemCount(item) == 0)
+		actorRef.AddItem(item, 1, true)
+		return 1
+	endIf
+	return 0
+endFunction
+
 int Function RestoreSpell(Spell sp, Actor actorRef) global
 	if (sp && !actorRef.HasSpell(sp))
 		actorRef.AddSpell(sp, false)

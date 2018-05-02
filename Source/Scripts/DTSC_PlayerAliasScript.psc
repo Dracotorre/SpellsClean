@@ -75,6 +75,12 @@ GlobalVariable property DTSC_VigorCI auto
 GlobalVariable property DTSC_SmilodonConf auto
 GlobalVariable property DTSC_DeadlyCombatConf auto
 GlobalVariable property DTSC_NATSet auto
+GlobalVariable property DTSC_ASGM auto
+GlobalVariable property DTSC_OBISmain auto
+GlobalVariable property DTSC_OBISpatrol auto
+GlobalVariable property DTSC_VividWeathers auto
+GlobalVariable property DTSC_SOTGenU auto
+GlobalVariable property DTSC_SOTGenSS auto
 
 int property CleanTaskOption auto hidden
 {2 = restore, 1 = remove}
@@ -169,6 +175,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 					Utility.WaitMenuMode(0.25)    ; v2.10
 					DTSC_CustomExceptionMsg.Show()
 				endIf
+				
 				return
 			endIf
 			
@@ -409,15 +416,30 @@ Function CleanSpells()
 		idx += 1
 	endWhile
 	
-	if (DTSC_IncludeItemsSetting.GetValueInt() > 0)
-		;  **** single Armor mods *****
-		cleanItemsCount += HandleArmorForMod(0x04005901, "Moonlight Tales Special Edition.esp", DTSC_MoonlightTales, restoreAll, ignoreDisabled)
+	if (DTSC_IncludeItemsSetting.GetValueInt() > 0 || (restoreAll && DTSC_HasItemsMod.GetValue() < 0.0))
+		
+		;  **** single Armor and Book mods *****
+		cleanItemsCount = HandleArmorForMod(0x04005901, "Moonlight Tales Special Edition.esp", DTSC_MoonlightTales, restoreAll, ignoreDisabled)
+		
+		cleanItemsCount += HandleBookForMod(0x0921D9E1, "Vivid WeathersSE.esp", DTSC_VividWeathers, restoreAll, ignoreDisabled)
+		
+		cleanItemsCount += HandleBookForMod(0x0901074F, "OBIS SE.esp", DTSC_OBISmain, restoreAll, ignoreDisabled)
+		cleanItemsCount += HandleBookForMod(0x09093562, "OBIS SE Patrols Addon.esp", DTSC_OBISpatrol, restoreAll, ignoreDisabled)
+		cleanItemsCount += HandleBookForMod(0x09004E0F, "AcquisitiveSoulGemMultithreaded.esp", DTSC_ASGM, restoreAll, ignoreDisabled)
+		
+		cleanItemsCount += HandleBookForMod(0x09006E75, "SOTGenesisMod.esp", DTSC_SOTGenU, restoreAll, ignoreDisabled)
+		cleanItemsCount += HandleBookForMod(0x0905BFEC, "Genesis Surface Spawns.esp", DTSC_SOTGenSS, restoreAll, ignoreDisabled)
+		
 		if (cleanItemsCount > 0)
-			modCount += 1
-			DTSC_HasItemsMod.SetValueInt(1)
+			modCount += cleanItemsCount
+			DTSC_HasItemsMod.SetValueInt(1) 
+		else
+			DTSC_HasItemsMod.SetValueInt(0)
 		endIf
 		
-		len = DTSC_ArmorsExtraList.GetSize()
+		; do custom list of armors 
+		len = DTSC_ArmorsExtraList.GetSize()  ; getsize first
+		
 		; v2.30 - recheck exclusions on update during clean phase
 		if (recheckExclusions && !restoreAll && len > 0)
 			CheckExclusionsForList(DTSC_ArmorsExtraList)
@@ -433,6 +455,9 @@ Function CleanSpells()
 			endIf
 			idx += 1
 		endWhile
+		
+		DTSC_HasItemsCustom.SetValueInt(len)
+		
 	endIf
 	
 	; **** remove our config spell **
@@ -464,6 +489,15 @@ int Function CleanArmor(Armor armItm)
 	if (armItm && PlayerRef.GetItemCount(armItm) > 0)
 		;Debug.Trace(self + " remove item " + armItm)
 		PlayerRef.RemoveItem(armItm, 1, true)
+		return 1
+	endIf
+	return 0
+endFunction
+
+int Function CleanBook(Book item)
+	if (item && PlayerRef.GetItemCount(item) > 0)
+		
+		PlayerRef.RemoveItem(item, 1, true)
 		return 1
 	endIf
 	return 0
@@ -521,7 +555,39 @@ int Function HandleArmorForMod(int formId, string modName,  GlobalVariable gVar,
 			result = ProcessTaskForArmor(taskOption, armorItem)
 			
 			gVar.SetValue(1.0)
-			Utility.Wait(0.1)
+			Utility.Wait(0.06)
+		else
+			gVar.SetValue(0.0)
+		endIf
+	endIf
+	return result
+endFunction
+
+int Function HandleBookForMod(int formId, string modName,  GlobalVariable gVar, bool restore, bool ignoreDisabled)
+	int taskOption = -1
+	int processMod = gVar.GetValueInt()
+	if (!ignoreDisabled)
+		
+		if (processMod <= 0)
+			return 0
+		endIf
+	endIf
+	int result = 0
+	if (restore)
+		taskOption = 2
+	elseIf (ignoreDisabled)
+		taskOption = 1
+	else
+		taskOption = processMod
+	endIf
+	
+	if (taskOption > 0)
+		Book item = IsPluginPresent(formId, modName) as Book
+		if (item)
+			result = ProcessTaskForBook(taskOption, item)
+			
+			gVar.SetValue(1.0)
+			Utility.Wait(0.06)
 		else
 			gVar.SetValue(0.0)
 		endIf
@@ -577,6 +643,8 @@ Function ManageMod()
 	if (oldV < vers)
 		recheckExclusions = true 
 		
+		Debug.Trace("[DTSC] upgrade old -> current " + oldV + " -> " + vers)
+		
 		if (oldV > 0.5 && oldV < 2.00)
 			DTSC_BetterVampConfig.SetValueInt(1)
 			DTSC_CampFrostOps.SetValueInt(1)
@@ -589,6 +657,7 @@ Function ManageMod()
 			DTSC_WetAndColdConfig.SetValueInt(1)
 			DTSC_WildcatConfig.SetValueInt(1)
 		endIf
+		
 		if (oldV > 1.0 && oldV < 2.02)
 			if (DTSC_MoonlightTales.GetValueInt() > 0)
 				DTSC_HasItemsMod.SetValueInt(1)
@@ -606,6 +675,11 @@ Function ManageMod()
 		if (oldV > 1.0 && oldV < 2.20 && DTSC_iNeedAction.GetValueInt() > 0 && DTSC_iNeedSetting.GetValueInt() < 0)
 			DTSC_iNeedSetting.SetValueInt(0)
 		endIf
+		
+		if (oldV < 2.40 && DTSC_HasItemsMod.GetValueInt() < 1)
+			; reset to check for new config book mods to monitor 
+			DTSC_HasItemsMod.SetValueInt(-1)
+		endIf
 
 		lastCaptureTime = Utility.GetCurrentRealTime()
 
@@ -618,6 +692,15 @@ int Function ProcessTaskForArmor(int taskOption, Armor armItm)
 		return CleanArmor(armItm)
 	elseIf (taskOption > 1)
 		return DTSC_CommonF.RestoreArmor(armItm, PlayerRef)
+	endIf
+	return 0
+endFunction
+
+int Function ProcessTaskForBook(int taskOption, Book item)
+	if (taskOption == 1)
+		return CleanBook(item)
+	elseIf (taskOption > 1)
+		return DTSC_CommonF.RestoreBook(item, PlayerRef)
 	endIf
 	return 0
 endFunction
