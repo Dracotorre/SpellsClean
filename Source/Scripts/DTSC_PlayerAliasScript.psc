@@ -34,7 +34,7 @@ GlobalVariable property DTSC_ModMonCount auto
 GlobalVariable property DTSC_HasItemsCustom auto
 FormList property DTSC_SpellsExtraList auto
 FormList property DTSC_ArmorsExtraList auto
-FormList property DTSC_ExtraExceptionList auto 
+FormList property DTSC_ExtraExceptionList auto
 
 ; constants
 GlobalVariable property DTSC_DisableAll auto
@@ -167,9 +167,9 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 		float curTime = Utility.GetCurrentGameTime()
 		float minDiff = DTSC_CommonF.GetGameTimeHoursDifference(curTime, captureTime) * 60.0
 		
-		;Debug.Trace("[DTSC] minDiff " + minDiff)
 		; v2.08 added more time allowance (pauses in menu) - 1.67 minutes game-time is 5 seconds real-time
 		if (minDiff < 1.667 && captureCount < DTSC_CaptureLimit.GetValueInt())
+			
 			if (DTSC_ExtraExceptionList.HasForm(akBaseObject))
 				if (DTSC_VerboseSetting.GetValueInt() > 0)
 					Utility.WaitMenuMode(0.25)    ; v2.10
