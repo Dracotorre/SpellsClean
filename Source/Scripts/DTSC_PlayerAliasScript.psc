@@ -143,7 +143,7 @@ Event OnUpdate()
 					ActivateConfig()
 					RegisterForSingleUpdate(waitSecs)
 					
-				elseIf (updateType <= 0)
+				elseIf (CleanTaskOption == 1 && updateType == 0)
 					; need to remove our config spell
 					updateType = 1
 					float extraDelay = DTSC_ConfigSpellRemDelay.GetValue()

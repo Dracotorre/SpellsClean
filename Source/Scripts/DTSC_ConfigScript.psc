@@ -44,6 +44,7 @@ Event OnEffectStart(Actor akTarget, Actor akCaster)
 	if (akCaster == PlayerREF)
 		DTSC_CaptureSpellAdd.SetValue(0.0)
 		HideOnExit = true
+		
 		Menu()
 	endIf
 EndEvent
@@ -115,6 +116,8 @@ Function Menu(int aiMessage = 0, int aiButton = 0, bool abMenu = true)
 				DTSC_WaitSecondsSetting.SetValueInt(234)
 			endIf
 		elseIf (aiMessage == 3)
+			ValidateCaptureLimit()
+			
 			int diButton = DTSC_ConfigAddCustomSpellMsg.Show(DTSC_CaptureLimit.GetValue(), DTSC_SpellsExtraList.GetSize(), DTSC_ArmorsExtraList.GetSize())
 			aiMessage = 0
 			
@@ -126,7 +129,7 @@ Function Menu(int aiMessage = 0, int aiButton = 0, bool abMenu = true)
 				DTSC_CaptureSpellAdd.SetValue(capTime)
 				
 				; grant bonus time before removing spell - v2.42
-				float extraTime = 9.0 + DTSC_ConfigSpellRemDelay.GetValue()
+				float extraTime = 12.0 + DTSC_ConfigSpellRemDelay.GetValue()
 				DTSC_ConfigSpellRemDelay.SetValue(extraTime)
 				
 				HideOnExit = false
@@ -166,5 +169,15 @@ Function RecoverCustomSpells()
 	if (len > 0)
 		DTSC_SpellsExtraList.Revert()
 		DTSC_HasItemsCustom.SetValueInt(0)
+	endIf
+EndFunction
+
+Function ValidateCaptureLimit()
+	int capLimit = DTSC_CaptureLimit.GetValueInt()
+		
+	if (capLimit > 100)
+		DTSC_CaptureLimit.SetValueInt(100)
+	elseIf (capLimit < 1)
+		DTSC_CaptureLimit.SetValueInt(1)
 	endIf
 EndFunction
