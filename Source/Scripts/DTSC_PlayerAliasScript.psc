@@ -147,7 +147,12 @@ Event OnUpdate()
 					; need to remove our config spell
 					updateType = 1
 					float extraDelay = DTSC_ConfigSpellRemDelay.GetValue()
-					RegisterForSingleUpdate(3.0 + extraDelay)
+					if (extraDelay > 100.0)
+						extraDelay = 100.0
+					elseIf (extraDelay < 1.0)
+						extraDelay = 1.1
+					endIf
+					RegisterForSingleUpdate(2.5 + extraDelay)
 					
 				endIf
 			endIf
