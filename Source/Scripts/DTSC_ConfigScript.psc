@@ -28,8 +28,10 @@ GlobalVariable property DTSC_iNeedSetting auto
 GlobalVariable property DTSC_IncludeItemsSetting auto
 GlobalVariable property DTSC_WaitSecondsSetting auto
 GlobalVariable property DTSC_CaptureSpellAdd auto
+{ signals if ready to capture spells }
 
 GlobalVariable property DTSC_HasItemsCustom auto
+GlobalVariable property DTSC_ConfigSpellRemDelay auto  ; added v2.42
 
 Spell property DTSC_ConfigSpell auto
 FormList property DTSC_SpellsExtraList auto
@@ -49,7 +51,8 @@ EndEvent
 Event OnEffectFinish(Actor akTarget, Actor akCaster)
 	;Debug.Trace("[DTSC] OnEffectFinish")
 	Utility.Wait(0.5)
-	if (akCaster == PlayerREF && HideOnExit)
+	if (akCaster == PlayerREF && HideOnExit && DTSC_ConfigSpellRemDelay.GetValue() < 1.20)
+		
 		PlayerREF.RemoveSpell(DTSC_ConfigSpell)
 	endIf
 EndEvent
@@ -121,6 +124,11 @@ Function Menu(int aiMessage = 0, int aiButton = 0, bool abMenu = true)
 				float capTime = Utility.GetCurrentGameTime()  ; v2.08
 				;Debug.Trace("[DTSC] menu AddSpell capTime: " + capTime)
 				DTSC_CaptureSpellAdd.SetValue(capTime)
+				
+				; grant bonus time before removing spell - v2.42
+				float extraTime = 9.0 + DTSC_ConfigSpellRemDelay.GetValue()
+				DTSC_ConfigSpellRemDelay.SetValue(extraTime)
+				
 				HideOnExit = false
 				abMenu = false
 			elseIf (diButton == 2)

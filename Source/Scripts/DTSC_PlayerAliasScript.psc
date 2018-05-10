@@ -32,6 +32,7 @@ GlobalVariable property DTSC_CaptureSpellAdd auto
 GlobalVariable property DTSC_InitOptions auto
 GlobalVariable property DTSC_ModMonCount auto
 GlobalVariable property DTSC_HasItemsCustom auto
+GlobalVariable property DTSC_ConfigSpellRemDelay auto  ; added v2.42
 FormList property DTSC_SpellsExtraList auto
 FormList property DTSC_ArmorsExtraList auto
 FormList property DTSC_ExtraExceptionList auto
@@ -89,11 +90,13 @@ bool recheckExclusions = false  ; v2.30 - in case more exclusions have been adde
 int captureCount = 0  ;v2.10
 float lastCaptureTime = 0.0     ; game-time
 float lastSpellAddedTime = 0.0  ;v2.25 real-time for equip too fast such as auto-equip other hand
+int updateType = 0   ; v2.42 - normal clean = 0, remove spell = 1
 
 ; ************************** Events *******************
 
 Event OnPlayerLoadGame()
 	UnregisterForUpdate()
+	updateType = 0
 	ManageMod()
 	lastSpellAddedTime = 0.01  ; reset for launch - v2.32 fix for excluding first equip
 		
@@ -104,36 +107,54 @@ Event OnPlayerLoadGame()
 EndEvent
 
 Event OnUpdate()
-
-	if (Game.IsFightingControlsEnabled())
-		; only process if enabled or restoring
-		if (DTSC_DisableAll.GetValue() <= 0.0)
-			int doRestore = DTSC_RestoreAllSpells.GetValueInt()
-			
-			; always restore
-			if (DTSC_DisableSetting.GetValue() < 1 || doRestore > 0 || CleanTaskOption == 2)
-				CleanSpells()
-			endIf
-			
-			if (CleanTaskOption == 2 && doRestore < 1)
-			
-				; remove spells on next update
-				CleanTaskOption = 1
-				float waitSecs = DTSC_WaitSecondsSetting.GetValue()
-				if (waitSecs > 300.0 || waitSecs <= 0.0)
-					waitSecs = DTSC_WaitSecondsToCheck.GetValue()
-				endIf
-				if (waitSecs < 8.0)
-					waitSecs = 8.0
-				endIf
-				
-				ActivateConfig()
-				RegisterForSingleUpdate(waitSecs)
-			endIf
+	if (updateType == 1)
+		updateType = 2
+		
+		DTSC_ConfigSpellRemDelay.SetValue(1.066)  ; reset
+		
+		; **** remove our config spell **
+		if (PlayerRef.HasSpell(DTSC_ConfigSpell))
+			PlayerRef.RemoveSpell(DTSC_ConfigSpell)
 		endIf
 	else
-		; no fight controls - try later
-		RegisterForSingleUpdate(12.0)
+		if (Game.IsFightingControlsEnabled())
+			; only process if enabled or restoring
+			if (DTSC_DisableAll.GetValue() <= 0.0)
+				int doRestore = DTSC_RestoreAllSpells.GetValueInt()
+				
+				; clean/restore - always restore first
+				if (DTSC_DisableSetting.GetValue() < 1 || doRestore > 0 || CleanTaskOption == 2)
+					CleanSpells()
+				endIf
+				
+				; do we clean next time?
+				if (CleanTaskOption == 2 && doRestore < 1)
+				
+					; remove spells on next update
+					CleanTaskOption = 1
+					float waitSecs = DTSC_WaitSecondsSetting.GetValue()
+					if (waitSecs > 300.0 || waitSecs <= 0.0)
+						waitSecs = DTSC_WaitSecondsToCheck.GetValue()
+					endIf
+					if (waitSecs < 8.0)
+						waitSecs = 8.0
+					endIf
+					
+					ActivateConfig()
+					RegisterForSingleUpdate(waitSecs)
+					
+				elseIf (updateType <= 0)
+					; need to remove our config spell
+					updateType = 1
+					float extraDelay = DTSC_ConfigSpellRemDelay.GetValue()
+					RegisterForSingleUpdate(3.0 + extraDelay)
+					
+				endIf
+			endIf
+		else
+			; no fight controls - try later
+			RegisterForSingleUpdate(12.0)
+		endIf
 	endIf
 EndEvent
 
@@ -167,8 +188,8 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 		float curTime = Utility.GetCurrentGameTime()
 		float minDiff = DTSC_CommonF.GetGameTimeHoursDifference(curTime, captureTime) * 60.0
 		
-		; v2.08 added more time allowance (pauses in menu) - 1.67 minutes game-time is 5 seconds real-time
-		if (minDiff < 1.667 && captureCount < DTSC_CaptureLimit.GetValueInt())
+		; v2.08 added more time allowance (pauses in menu) - 1.67 minutes game-time is 5 seconds real-time ;v2.42 add another second
+		if (minDiff < 2.0004 && captureCount < DTSC_CaptureLimit.GetValueInt())
 			
 			if (DTSC_ExtraExceptionList.HasForm(akBaseObject))
 				if (DTSC_VerboseSetting.GetValueInt() > 0)
@@ -458,11 +479,6 @@ Function CleanSpells()
 		
 		DTSC_HasItemsCustom.SetValueInt(len)
 		
-	endIf
-	
-	; **** remove our config spell **
-	if (PlayerRef.HasSpell(DTSC_ConfigSpell))
-		PlayerRef.RemoveSpell(DTSC_ConfigSpell)
 	endIf
 	
 	if (DTSC_ModMonCount.GetValueInt() == 0)
