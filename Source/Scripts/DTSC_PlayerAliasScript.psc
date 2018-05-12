@@ -442,7 +442,7 @@ Function CleanSpells()
 		idx += 1
 	endWhile
 	
-	if (DTSC_IncludeItemsSetting.GetValueInt() > 0 || (restoreAll && DTSC_HasItemsMod.GetValue() < 0.0))
+	if (DTSC_IncludeItemsSetting.GetValueInt() > 0 || ignoreDisabled || (restoreAll && DTSC_HasItemsMod.GetValue() < 0.0))
 		
 		;  **** single Armor and Book mods *****
 		cleanItemsCount = HandleArmorForMod(0x04005901, "Moonlight Tales Special Edition.esp", DTSC_MoonlightTales, restoreAll, ignoreDisabled)
@@ -459,7 +459,7 @@ Function CleanSpells()
 		if (cleanItemsCount > 0)
 			modCount += cleanItemsCount
 			DTSC_HasItemsMod.SetValueInt(1) 
-		else
+		elseIf (DTSC_HasItemsMod.GetValueInt() < 0)
 			DTSC_HasItemsMod.SetValueInt(0)
 		endIf
 		
@@ -697,7 +697,7 @@ Function ManageMod()
 			DTSC_iNeedSetting.SetValueInt(0)
 		endIf
 		
-		if (oldV < 2.40 && DTSC_HasItemsMod.GetValueInt() < 1)
+		if (oldV <= 2.42 && DTSC_HasItemsMod.GetValueInt() < 1)
 			; reset to check for new config book mods to monitor 
 			DTSC_HasItemsMod.SetValueInt(-1)
 		endIf
