@@ -6,6 +6,7 @@ Scriptname DTSC_ConfigScript extends ActiveMagicEffect
 ; configuration menus - 2 sub-menus, 1 for extras and 1 for timer
 
 Actor property PlayerREF auto
+ReferenceAlias property KeepCleanQuestAlias auto
 
 ; menu messages
 Message property DTSC_ConfigMessage auto
@@ -136,41 +137,14 @@ Function Menu(int aiMessage = 0, int aiButton = 0, bool abMenu = true)
 				abMenu = false
 			elseIf (diButton == 2)
 				DTSC_CaptureSpellAdd.SetValue(0.0)
-				RecoverCustomArmors()
-				RecoverCustomSpells()
+				(KeepCleanQuestAlias as DTSC_PlayerAliasScript).RecoverCustomArmors()
+				(KeepCleanQuestAlias as DTSC_PlayerAliasScript).RecoverCustomSpells()
 			endIf
 		endIf
 	endWhile
 EndFunction
 
-Function RecoverCustomArmors()
-	int len = DTSC_ArmorsExtraList.GetSize()
-	int idx = 0
-	while (idx < len)
-		Armor aArm = DTSC_ArmorsExtraList.GetAt(idx) as Armor
-		DTSC_CommonF.RestoreArmor(aArm, PlayerREF)
-		Utility.WaitMenuMode(0.05)
-		idx += 1
-	endWhile
-	if (len > 0)
-		DTSC_ArmorsExtraList.Revert()
-	endIf
-EndFunction
 
-Function RecoverCustomSpells()
-	int len = DTSC_SpellsExtraList.GetSize()
-	int idx = 0
-	while (idx < len)
-		Spell aSpell = DTSC_SpellsExtraList.GetAt(idx) as Spell
-		DTSC_CommonF.RestoreSpell(aSpell, PlayerREF)
-		Utility.WaitMenuMode(0.05)
-		idx += 1
-	endWhile
-	if (len > 0)
-		DTSC_SpellsExtraList.Revert()
-		DTSC_HasItemsCustom.SetValueInt(0)
-	endIf
-EndFunction
 
 Function ValidateCaptureLimit()
 	int capLimit = DTSC_CaptureLimit.GetValueInt()

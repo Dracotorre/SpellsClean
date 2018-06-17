@@ -1,5 +1,15 @@
 ScriptName DTSC_CommonF hidden
 
+; v2.08 added more time allowance (pauses in menu) - 1.67 minutes game-time is 5 seconds real-time ;v2.42 add another second
+bool Function AddSpellCaptureTimeOK(float captureStartTime) global
+	float curTime = Utility.GetCurrentGameTime()
+	float minDiff = GetGameTimeHoursDifference(curTime, captureStartTime) * 60.0
+	if (minDiff < 2.0004)
+		return true
+	endIf
+	return false
+endFunction
+
 float Function GetGameTimeHoursDifference(float time1, float time2) global
 	float result = 0.0
 	if (time2 == time1)

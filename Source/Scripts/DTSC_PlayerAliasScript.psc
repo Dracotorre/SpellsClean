@@ -18,6 +18,7 @@ Quest property MQ101Quest auto
 Keyword property ArmorJewelryKY auto
 Keyword property ClothingRingKY auto
 
+Quest property DTSC_SkyUIConfigQuest auto
 Message property DTSC_CleanTotalMsg auto
 Message property DTSC_CustomSpellAddedMsg auto
 Message property DTSC_CustomExceptionMsg auto
@@ -26,6 +27,7 @@ Message property DTSC_CustomArmorAddedMsg auto
 Message property DTSC_InitMessage auto
 Message property DTSC_ConfirmRemoveMsg auto
 Message property DTSC_EquipFailMsg auto
+Message property DTSC_VersionErrorDowngradeMsg auto
 Spell property DTSC_ConfigSpell auto
 GlobalVariable property DTSC_HasItemsMod auto
 GlobalVariable property DTSC_CaptureSpellAdd auto
@@ -49,6 +51,7 @@ GlobalVariable property DTSC_IsXB1 auto  ; skip if Xbox
 GlobalVariable property DTSC_CaptureLimit auto
 
 ; settings
+GlobalVariable property DTSC_CaptureLimitSetting auto
 GlobalVariable property DTSC_VerboseSetting auto
 GlobalVariable property DTSC_RecheckModsSettings auto
 GlobalVariable property DTSC_DisableSetting auto
@@ -85,6 +88,7 @@ GlobalVariable property DTSC_SOTGenSS auto
 
 int property CleanTaskOption auto hidden
 {2 = restore, 1 = remove}
+bool property IsSkyUIPresent auto hidden
 
 bool recheckExclusions = false  ; v2.30 - in case more exclusions have been added in update
 int captureCount = 0  ;v2.10
@@ -97,7 +101,9 @@ int updateType = 0   ; v2.42 - normal clean = 0, remove spell = 1
 Event OnPlayerLoadGame()
 	UnregisterForUpdate()
 	updateType = 0
+	CheckSkyUI()
 	ManageMod()
+	
 	lastSpellAddedTime = 0.01  ; reset for launch - v2.32 fix for excluding first equip
 		
 	; first update restores all spells
@@ -117,6 +123,14 @@ Event OnUpdate()
 			PlayerRef.RemoveSpell(DTSC_ConfigSpell)
 		endIf
 	else
+		if (updateType == 0)
+			float vers = DTSC_Version.GetValue()
+			float oldV = DTSC_VersionPrior.GetValue()
+			if (oldV > vers)
+				DTSC_VersionErrorDowngradeMsg.Show(vers, oldV)
+			endIf
+		endIf
+		
 		if (Game.IsFightingControlsEnabled())
 			; only process if enabled or restoring
 			if (DTSC_DisableAll.GetValue() <= 0.0)
@@ -193,8 +207,15 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 		float curTime = Utility.GetCurrentGameTime()
 		float minDiff = DTSC_CommonF.GetGameTimeHoursDifference(curTime, captureTime) * 60.0
 		
-		; v2.08 added more time allowance (pauses in menu) - 1.67 minutes game-time is 5 seconds real-time ;v2.42 add another second
-		if (minDiff < 2.0004 && captureCount < DTSC_CaptureLimit.GetValueInt())
+		bool capOK = DTSC_CommonF.AddSpellCaptureTimeOK(captureTime)
+	
+		int capLimit = DTSC_CaptureLimitSetting.GetValueInt()
+		
+		if (DTSC_MCMSetting.GetValueInt() < 1 || capLimit < 1 || capLimit > 100)
+			capLimit = DTSC_CaptureLimit.GetValueInt()
+		endIf
+		
+		if (capOK && captureCount < capLimit)
 			
 			if (DTSC_ExtraExceptionList.HasForm(akBaseObject))
 				if (DTSC_VerboseSetting.GetValueInt() > 0)
@@ -289,6 +310,24 @@ Function CheckExclusionsForList(FormList aList)
 			idx -= 1
 		endWhile
 	endIf
+endFunction
+
+bool Function CheckSkyUI()
+
+	IsSkyUIPresent = IsPluginPresent(0x01000814, "SkyUI_SE.esp") as bool
+	
+	if (IsSkyUIPresent)
+		if (DTSC_SkyUIConfigQuest.IsRunning() == false)
+			DTSC_SkyUIConfigQuest.Start()
+			DTSC_MCMSetting.SetValueInt(1)
+			DTSC_CaptureLimitSetting.SetValueInt(64)
+		endIf
+	else
+		DTSC_CaptureLimitSetting.SetValueInt(12)
+		DTSC_MCMSetting.SetValueInt(0)
+	endIf
+	
+	return IsSkyUIPresent
 endFunction
 
 Function CleanSpells()
@@ -734,6 +773,37 @@ int Function ProcessTaskForSpell(int taskOption, Spell sp)
 	endIf
 	return 0
 endFunction
+
+; placed here for external use
+Function RecoverCustomArmors()
+	int len = DTSC_ArmorsExtraList.GetSize()
+	int idx = 0
+	while (idx < len)
+		Armor aArm = DTSC_ArmorsExtraList.GetAt(idx) as Armor
+		DTSC_CommonF.RestoreArmor(aArm, PlayerREF)
+		Utility.WaitMenuMode(0.05)
+		idx += 1
+	endWhile
+	if (len > 0)
+		DTSC_ArmorsExtraList.Revert()
+	endIf
+EndFunction
+
+; for external use
+Function RecoverCustomSpells()
+	int len = DTSC_SpellsExtraList.GetSize()
+	int idx = 0
+	while (idx < len)
+		Spell aSpell = DTSC_SpellsExtraList.GetAt(idx) as Spell
+		DTSC_CommonF.RestoreSpell(aSpell, PlayerREF)
+		Utility.WaitMenuMode(0.05)
+		idx += 1
+	endWhile
+	if (len > 0)
+		DTSC_SpellsExtraList.Revert()
+		DTSC_HasItemsCustom.SetValueInt(0)
+	endIf
+EndFunction
 
 ; **************** no longer used *******************
 
