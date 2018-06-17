@@ -10,6 +10,7 @@ GlobalVariable property DTSC_CaptureSpellAdd auto
 FormList property DTSC_ArmorExtraList auto
 FormList property DTSC_SpellsExtraList auto
 
+GlobalVariable property DTSC_InitOptions auto 
 GlobalVariable property DTSC_WearableLantConfig auto
 GlobalVariable property DTSC_iNeedAction auto
 GlobalVariable property DTSC_HasItemsCustom auto
@@ -24,6 +25,18 @@ GlobalVariable property DTSC_WLToggleSettings auto
 GlobalVariable property DTSC_iNeedSetting auto
 GlobalVariable property DTSC_IncludeItemsSetting auto
 GlobalVariable property DTSC_WaitSecondsSetting auto
+GlobalVariable property DTSC_CleanCustomSetting auto
+
+bool property RequestCleanReset auto hidden
+{ flag to ask if need to clean/restore all on menu close }
+bool property RequestCleanCustom auto hidden
+{ flag to ask if need to clean add-a-spell customs on menu close }
+bool property RequestCleanItems auto hidden
+{ flag to clean on menu close }
+bool property RequestCleanWL auto hidden
+{ flag to clean on menu close }
+bool property RequestCleanINeed auto hidden
+{ flag to clean on menu close }
 
 ; ===============================================
 ; local
@@ -40,6 +53,7 @@ int SettingCleanWL_OID
 int SettingClean_iNeed_OID
 int SettingCleanItems_OID
 int SettingAddSpellEnable_OID
+int SettingAddSpellCleanEnable_OID
 int SettingAddSpellReset_OID
 int SettingAddSpellMaxOptionA_OID
 int SettingAddSpellMaxOptionB_OID
@@ -47,8 +61,32 @@ int SettingAddSpellMaxOptionC_OID
 int TextCustomSpellList_OID
 int TextCustomArmorList_OID
 
+
 ; ====================================
 ;  events
+
+Event OnConfigClose()
+	if (RequestCleanReset)
+		RequestCleanReset = false
+		(KeepCleanQuestAlias as DTSC_PlayerAliasScript).RequestReset()
+	elseIf (RequestCleanCustom)
+		RequestCleanCustom = false
+		(KeepCleanQuestAlias as DTSC_PlayerAliasScript).RequestCleanCustoms()
+	else
+		if (RequestCleanItems)
+			RequestCleanItems = false
+			(KeepCleanQuestAlias as DTSC_PlayerAliasScript).RequestCleanItems()
+		endIf
+		if (RequestCleanINeed)
+			RequestCleanINeed = false
+			(KeepCleanQuestAlias as DTSC_PlayerAliasScript).RequestCleanINeed()
+		endIf
+		if (RequestCleanWL)
+			RequestCleanWL = false
+			(KeepCleanQuestAlias as DTSC_PlayerAliasScript).RequestCleanWLOption()
+		endIf
+	endIf
+endEvent
 
 Event OnConfigInit()
 	Pages = new string[2]
@@ -56,18 +94,30 @@ Event OnConfigInit()
 	Pages[1] = "$SpellsCleanAddSpellPage"
 endEvent
 
-Event OnPageReset(string page)
+Event OnConfigOpen()
+	RequestCleanReset = false
+	RequestCleanCustom = false
+	RequestCleanINeed = false
+	RequestCleanItems = false
+	RequestCleanWL = false
+endEvent
 
-	if (Pages == None)
-		OnConfigInit()
-	endif
+Event OnPageReset(string page)
 	
-	if (page == "" || page == "$SpellsCleanOptionsPage")
-		ResetPageMain()
-	elseIf (page == "$SpellsCleanAddSpellPage")
-		ResetPageAddSpell()
-	else
-		ResetPageMain()
+	if (page == "")
+		if (DTSC_InitOptions.GetValueInt() > 0)
+			ResetPageMain()
+		else
+			ResetPageInit()
+		endIf
+	elseIf (DTSC_InitOptions.GetValueInt() > 0)
+		if (page == "$SpellsCleanOptionsPage")
+			ResetPageMain()
+		elseIf (page == "$SpellsCleanAddSpellPage")
+			ResetPageAddSpell()
+		else
+			ResetPageMain()
+		endIf
 	endIf
 	
 endEvent
@@ -89,32 +139,55 @@ Event OnOptionHighlight(int option)
 		SetInfoText("$AddSpellResetInfo")
 	elseIf (option == SettingCleanWL_OID)
 		SetInfoText("$WLTogglInfo")
-	elseIf (option == SettingTimerA_OID || option == SettingTimerB_OID || option == SettingTimerC_OID)
+	elseIf (option == SettingTimerA_OID || option == SettingTimerB_OID || option == SettingTimerC_OID || option == SettingTimerD_OID)
 		SetInfoText("$TimerSettingInfo")
-	elseIf (option == SettingAddSpellMaxOptionA_OID || SettingAddSpellMaxOptionB_OID || SettingAddSpellMaxOptionC_OID)
+	elseIf (option == SettingAddSpellMaxOptionA_OID || option == SettingAddSpellMaxOptionB_OID || option == SettingAddSpellMaxOptionC_OID)
 		SetInfoText("$AddSpellMaxInfo")
 	elseIf (option == TextCustomSpellList_OID)
 		SetInfoText("$CustomSpellListInfo")
 	elseIf (option == TextCustomArmorList_OID)
 		SetInfoText("$CustomArmorListInfo")
+	elseIf (option == SettingAddSpellCleanEnable_OID)
+		SetInfoText("$AddSpellCleanEnableInfo")
 	endIf
 endEvent
 
 Event OnOptionSelect(int option) 
+	if (DTSC_InitOptions.GetValueInt() < 1)
+		return
+	endIf
+	
 	if (option == SettingCleanEnabled_OID)
 		SetToggleGlobalVar(DTSC_DisableSetting, option, 0.0)
+		
+		; flag to restore or clean spells if needed when menu closes
+		; in case player toggles repeatedly - only do once
+		RequestCleanReset = true
+
 	elseIf (option == SettingVerboseEnabled_OID)
 		SetToggleGlobalVar(DTSC_VerboseSetting, option, 1.0)
 	elseIf (option == SettingPreferMCM_OID)
 		SetToggleGlobalVar(DTSC_MCMSetting, option, 0.0)
 	elseIf (option == SettingCleanItems_OID)
 		SetToggleGlobalVar(DTSC_IncludeItemsSetting, option, 1.0)
+		
+		RequestCleanItems = true ; flag for close
+		
 	elseIf (option == SettingCleanWL_OID)
 		SetToggleGlobalVar(DTSC_WLToggleSettings, option, 1.0)
+		
+		RequestCleanWL = true ; flag for close
+		
 	elseIf (option == SettingClean_iNeed_OID)
 		SetToggleGlobalVar(DTSC_iNeedSetting, option, 1.0)
+		
+		RequestCleanINeed = true ; flag for close
+		
 	elseIf (option == SettingRecheckMods_OID)
 		SetToggleGlobalVar(DTSC_RecheckModsSetting, option, 1.0)
+		
+		RequestCleanReset = true ; flag to force mod check
+		
 	elseIf (option == SettingTimerA_OID)
 		SetWaitTimerOption(option, 12.0)
 	elseIf (option == SettingTimerB_OID)
@@ -131,16 +204,20 @@ Event OnOptionSelect(int option)
 		SetMaxCountOption(option, 64)
 	elseIf (option == SettingAddSpellEnable_OID)
 		float capTime = DTSC_CaptureSpellAdd.GetValue()
-		bool capOn = DTSC_CommonF.AddSpellCaptureTimeOK(capTime)
+		bool capOn = DTSC_CommonF.AddSpellCaptureTimeOK(capTime, true)
 		if (capOn)
 			; disable add-a-spell 
 			DTSC_CaptureSpellAdd.SetValue(0.0)
 			SetToggleOptionValue(option, false)
+			
+			; flag to request extra clean
+			RequestCleanCustom = true
 		else
 			; enable add-a-spell
 			float gameTime = Utility.GetCurrentGameTime()
 			DTSC_CaptureSpellAdd.SetValue(gameTime)
 			SetToggleOptionValue(option, true)
+
 		endIf
 	elseIf (option == SettingAddSpellReset_OID)
 		DTSC_CaptureSpellAdd.SetValue(0.0)
@@ -148,6 +225,10 @@ Event OnOptionSelect(int option)
 		(KeepCleanQuestAlias as DTSC_PlayerAliasScript).RecoverCustomSpells()
 		SetTextOptionValue(TextCustomSpellList_OID, "0")
 		SetTextOptionValue(TextCustomArmorList_OID, "0")
+	elseIf (option == SettingAddSpellCleanEnable_OID)
+		SetToggleGlobalVar(DTSC_CleanCustomSetting, option, 1.0)
+		
+		RequestCleanCustom = true  ; flag for menu close
 	endIf 
 endEvent
 
@@ -166,12 +247,15 @@ Function ResetPageAddSpell()
 	TextCustomArmorList_OID = AddTextOption("$CurrentArmorList", itemCountStr)
 	
 	AddEmptyOption()
-	AddEmptyOption()
 	
 	AddHeaderOption("$AddSpellControlHeader")
 	
+	SettingAddSpellCleanEnable_OID = AddToggleOption("$AddSpellCleanEnable", DTSC_CleanCustomSetting.GetValueInt() == 1)
+	
+	AddEmptyOption()
+	
 	float capTime = DTSC_CaptureSpellAdd.GetValue()
-	bool capOn = DTSC_CommonF.AddSpellCaptureTimeOK(capTime)
+	bool capOn = DTSC_CommonF.AddSpellCaptureTimeOK(capTime, true)
 	
 	SettingAddSpellEnable_OID = AddToggleOption("$AddSpellEnabled", capOn)
 	
@@ -189,6 +273,13 @@ Function ResetPageAddSpell()
 	SettingAddSpellMaxOptionB_OID = AddToggleOption("12", capCountLim == 12)
 	SettingAddSpellMaxOptionC_OID = AddToggleOption("64", capCountLim == 64)
 	
+endFunction
+
+Function ResetPageInit()
+	AddHeaderOption("$InitHeader")
+	AddEmptyOption()
+	AddTextOption("$PleaseWait", "")
+
 endFunction
 
 Function ResetPageMain()

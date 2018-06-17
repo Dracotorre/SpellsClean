@@ -18,6 +18,8 @@ Event OnInit()
 endEvent
 
 Event OnUpdate()
+	(DTSC_PlayerAliasScriptP as DTSC_PlayerAliasScript).CheckSkyUI()
+	
 	if (MQ101Quest.IsCompleted())
 		if (Game.IsFightingControlsEnabled())
 			if (UpdateStep == 1)

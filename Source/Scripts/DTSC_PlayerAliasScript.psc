@@ -25,6 +25,7 @@ Message property DTSC_CustomExceptionMsg auto
 Message property DTSC_CustomExistsMsg auto
 Message property DTSC_CustomArmorAddedMsg auto
 Message property DTSC_InitMessage auto
+Message property DTSC_InitMCMMessage auto
 Message property DTSC_ConfirmRemoveMsg auto
 Message property DTSC_EquipFailMsg auto
 Message property DTSC_VersionErrorDowngradeMsg auto
@@ -61,6 +62,7 @@ GlobalVariable property DTSC_WLToggleSetting auto
 GlobalVariable property DTSC_iNeedSetting auto
 GlobalVariable property DTSC_CampFrostExtras auto
 GlobalVariable property DTSC_WaitSecondsSetting auto
+GlobalVariable property DTSC_CleanCustomSetting auto
 
 ; mods -- 0 = skip, 1 = process -- saved
 GlobalVariable property DTSC_CampFrostOps auto
@@ -94,13 +96,13 @@ bool recheckExclusions = false  ; v2.30 - in case more exclusions have been adde
 int captureCount = 0  ;v2.10
 float lastCaptureTime = 0.0     ; game-time
 float lastSpellAddedTime = 0.0  ;v2.25 real-time for equip too fast such as auto-equip other hand
-int updateType = 0   ; v2.42 - normal clean = 0, remove spell = 1
+int updateType = 2   ; normal clean = 0, remove spell = 1, done = 2, clean custom = 3
 
 ; ************************** Events *******************
 
 Event OnPlayerLoadGame()
 	UnregisterForUpdate()
-	updateType = 0
+	updateType = -1
 	CheckSkyUI()
 	ManageMod()
 	
@@ -109,11 +111,29 @@ Event OnPlayerLoadGame()
 	; first update restores all spells
 	CleanTaskOption = 2
 	
-	RegisterForSingleUpdate(2.4)
+	RegisterForSingleUpdate(1.6)
 EndEvent
 
 Event OnUpdate()
-	if (updateType == 1)
+	if (updateType == -1)
+		float vers = DTSC_Version.GetValue()
+		float oldV = DTSC_VersionPrior.GetValue()
+		if (oldV > vers)
+			DTSC_VersionErrorDowngradeMsg.Show(vers, oldV)
+		endIf
+		updateType = 0
+		RegisterForSingleUpdate(2.0)
+	elseIf (updateType == 3)
+		updateType = 2
+		if (DTSC_CleanCustomSetting.GetValueInt() > 0)
+			CleanCapturedArmors(1, false)
+			CleanCapturedSpells(1, false)
+		else
+			CleanCapturedArmors(2, false)
+			CleanCapturedSpells(2, false)
+		endIf
+
+	elseIf (updateType == 1)
 		updateType = 2
 		
 		DTSC_ConfigSpellRemDelay.SetValue(1.066)  ; reset
@@ -123,13 +143,6 @@ Event OnUpdate()
 			PlayerRef.RemoveSpell(DTSC_ConfigSpell)
 		endIf
 	else
-		if (updateType == 0)
-			float vers = DTSC_Version.GetValue()
-			float oldV = DTSC_VersionPrior.GetValue()
-			if (oldV > vers)
-				DTSC_VersionErrorDowngradeMsg.Show(vers, oldV)
-			endIf
-		endIf
 		
 		if (Game.IsFightingControlsEnabled())
 			; only process if enabled or restoring
@@ -160,12 +173,16 @@ Event OnUpdate()
 				elseIf (CleanTaskOption == 1 && updateType == 0)
 					; need to remove our config spell
 					updateType = 1
+					
 					float extraDelay = DTSC_ConfigSpellRemDelay.GetValue()
-					if (extraDelay > 100.0)
+					if (DTSC_MCMSetting.GetValueInt() >= 1)
+						extraDelay = 0.0
+					elseIf (extraDelay > 100.0)
 						extraDelay = 100.0
 					elseIf (extraDelay < 1.0)
 						extraDelay = 1.1
 					endIf
+					
 					RegisterForSingleUpdate(2.5 + extraDelay)
 					
 				endIf
@@ -207,7 +224,7 @@ Event OnObjectEquipped(Form akBaseObject, ObjectReference akReference)
 		float curTime = Utility.GetCurrentGameTime()
 		float minDiff = DTSC_CommonF.GetGameTimeHoursDifference(curTime, captureTime) * 60.0
 		
-		bool capOK = DTSC_CommonF.AddSpellCaptureTimeOK(captureTime)
+		bool capOK = DTSC_CommonF.AddSpellCaptureTimeOK(captureTime, DTSC_MCMSetting.GetValueInt() == 1)
 	
 		int capLimit = DTSC_CaptureLimitSetting.GetValueInt()
 		
@@ -248,12 +265,18 @@ endEvent
 ; ***************************  Functions ******************
 
 Function ActivateConfig()
-	if (DTSC_MCMSetting.GetValueInt() < 1 && !PlayerRef.HasSpell(DTSC_ConfigSpell))
+	if (!PlayerRef.HasSpell(DTSC_ConfigSpell))
 		;Debug.Trace("[DTSC] add config spell: " + DTSC_ConfigSpell)
-		PlayerRef.AddSpell(DTSC_ConfigSpell, false)
+		if (DTSC_MCMSetting.GetValueInt() < 1)
+			PlayerRef.AddSpell(DTSC_ConfigSpell, false)
+		endIf
 		if (DTSC_InitOptions.GetValueInt() <= 0)
 			DTSC_InitOptions.SetValueInt(1)
-			DTSC_InitMessage.Show(DTSC_ModMonCount.GetValue())
+			if (DTSC_MCMSetting.GetValueInt() < 1)
+				DTSC_InitMessage.Show(DTSC_ModMonCount.GetValue())
+			else
+				DTSC_InitMCMMessage.Show(DTSC_ModMonCount.GetValue())
+			endIf
 		endIf
 	endIf
 endFunction
@@ -374,6 +397,7 @@ Function CleanSpells()
 		elseIf (ignoreDisabled)
 			taskOption = 1
 		endIf
+		
 		string pluginName = "Chesko_WearableLantern.esp"
 		sp = IsPluginPresent(0x0601F49C, pluginName) as Spell  ; Config
 		if (sp)
@@ -382,10 +406,7 @@ Function CleanSpells()
 			DTSC_WearableLantConfig.SetValue(1.0)
 			
 			if (DTSC_WLToggleSetting.GetValueInt() > 0 || restoreAll)
-				sp = Game.GetFormFromFile(0x06020A40, pluginName) as Spell  ; toggle lantern
-				cleanSpellsCount += ProcessTaskForSpell(taskOption, sp)
-				sp = Game.GetFormFromFile(0x06020A42, pluginName) as Spell  ; check fuel
-				cleanSpellsCount += ProcessTaskForSpell(taskOption, sp)
+				cleanSpellsCount += CleanWLOptionals(pluginName, taskOption)
 			endIf
 			Utility.Wait(0.1)
 		else
@@ -464,65 +485,39 @@ Function CleanSpells()
 		taskOption = 1
 	endIf
 	
-	int len = DTSC_SpellsExtraList.GetSize()
-	; v2.30 - added recheck exclusions to modify list on clean phase
-	if (recheckExclusions && !restoreAll && len > 0)
-		CheckExclusionsForList(DTSC_SpellsExtraList)
-		len = DTSC_SpellsExtraList.GetSize() ; update
+	if (DTSC_CleanCustomSetting.GetValueInt() > 0)
+		cleanSpellsCount += CleanCapturedSpells(taskOption, restoreAll)
 	endIf
 	
-	int idx = 0
-	while (idx < len)
-		Spell aSpell = DTSC_SpellsExtraList.GetAt(idx) as Spell
-		if (aSpell)
-			cleanSpellsCount += ProcessTaskForSpell(taskOption, aSpell)
-			Utility.Wait(0.1)
-		endIf
-		idx += 1
-	endWhile
+	; *** items ***
 	
-	if (DTSC_IncludeItemsSetting.GetValueInt() > 0 || ignoreDisabled || (restoreAll && DTSC_HasItemsMod.GetValue() < 0.0))
+	if (DTSC_IncludeItemsSetting.GetValueInt() > 0 || ignoreDisabled || DTSC_HasItemsMod.GetValue() < 0.0)
+		bool skipReportCount = false
 		
-		;  **** single Armor and Book mods *****
-		cleanItemsCount = HandleArmorForMod(0x04005901, "Moonlight Tales Special Edition.esp", DTSC_MoonlightTales, restoreAll, ignoreDisabled)
-		
-		cleanItemsCount += HandleBookForMod(0x0921D9E1, "Vivid WeathersSE.esp", DTSC_VividWeathers, restoreAll, ignoreDisabled)
-		
-		cleanItemsCount += HandleBookForMod(0x0901074F, "OBIS SE.esp", DTSC_OBISmain, restoreAll, ignoreDisabled)
-		cleanItemsCount += HandleBookForMod(0x09093562, "OBIS SE Patrols Addon.esp", DTSC_OBISpatrol, restoreAll, ignoreDisabled)
-		cleanItemsCount += HandleBookForMod(0x09004E0F, "AcquisitiveSoulGemMultithreaded.esp", DTSC_ASGM, restoreAll, ignoreDisabled)
-		
-		cleanItemsCount += HandleBookForMod(0x09006E75, "SOTGenesisMod.esp", DTSC_SOTGenU, restoreAll, ignoreDisabled)
-		cleanItemsCount += HandleBookForMod(0x0905BFEC, "Genesis Surface Spawns.esp", DTSC_SOTGenSS, restoreAll, ignoreDisabled)
+		if (DTSC_HasItemsMod.GetValueInt() < 0)
+			; don't clean on establish
+			cleanItemsCount = CleanItems(true, true)
+			skipReportCount = true
+		else
+			cleanItemsCount = CleanItems(restoreAll, ignoreDisabled)
+		endIf
 		
 		if (cleanItemsCount > 0)
+			
 			modCount += cleanItemsCount
 			DTSC_HasItemsMod.SetValueInt(1) 
+			
+			if (skipReportCount)
+				cleanItemsCount = 0
+			endIf
 		elseIf (DTSC_HasItemsMod.GetValueInt() < 0)
 			DTSC_HasItemsMod.SetValueInt(0)
 		endIf
 		
-		; do custom list of armors 
-		len = DTSC_ArmorsExtraList.GetSize()  ; getsize first
-		
-		; v2.30 - recheck exclusions on update during clean phase
-		if (recheckExclusions && !restoreAll && len > 0)
-			CheckExclusionsForList(DTSC_ArmorsExtraList)
-			len = DTSC_ArmorsExtraList.GetSize()  ; update 
+		if (DTSC_CleanCustomSetting.GetValueInt() > 0)
+			; do custom list of armors 
+			cleanItemsCount += CleanCapturedArmors(taskOption, restoreAll)
 		endIf
-		
-		idx = 0
-		while (idx < len)
-			Armor armItem = DTSC_ArmorsExtraList.GetAt(idx) as Armor
-			if (armItem)
-				cleanItemsCount += ProcessTaskForArmor(taskOption, armItem)
-				Utility.Wait(0.1)
-			endIf
-			idx += 1
-		endWhile
-		
-		DTSC_HasItemsCustom.SetValueInt(len)
-		
 	endIf
 	
 	if (DTSC_ModMonCount.GetValueInt() == 0)
@@ -534,13 +529,16 @@ Function CleanSpells()
 		; update count on remove phase
 		DTSC_ModMonCount.SetValueInt(modCount)
 		
-		DTSC_RecheckModsSettings.SetValueInt(0)
 		if (DTSC_VerboseSetting.GetValue() > 0.0 || DTSC_Verbose.GetValue() > 0.0)
 			if (cleanSpellsCount > 0 || cleanItemsCount > 0)
 				DTSC_CleanTotalMsg.Show(cleanSpellsCount, cleanItemsCount)
 			endIf
 		endIf
 		recheckExclusions = false
+	endIf
+	
+	if (ignoreDisabled)
+		DTSC_RecheckModsSettings.SetValueInt(0)
 	endIf
 	
 endFunction
@@ -572,6 +570,87 @@ int Function CleanSpell(Spell sp)
 	return 0
 endFunction
 
+; v2.50 - moved block to this function for re-use
+int Function CleanCapturedArmors(int taskOption, bool restoreAll)
+	int resultCount = 0
+	int len = DTSC_ArmorsExtraList.GetSize()  ; getsize first
+		
+	; v2.30 - recheck exclusions on update during clean phase
+	if (recheckExclusions && !restoreAll && len > 0)
+		CheckExclusionsForList(DTSC_ArmorsExtraList)
+		len = DTSC_ArmorsExtraList.GetSize()  ; update 
+	endIf
+	
+	int idx = 0
+	while (idx < len)
+		Armor armItem = DTSC_ArmorsExtraList.GetAt(idx) as Armor
+		if (armItem)
+			resultCount += ProcessTaskForArmor(taskOption, armItem)
+			Utility.Wait(0.1)
+		endIf
+		idx += 1
+	endWhile
+	
+	DTSC_HasItemsCustom.SetValueInt(len)
+	
+	return resultCount
+endFunction
+
+; v2.50 - moved block to this function for re-use
+int Function CleanCapturedSpells(int taskOption, bool restoreAll)
+	int resultCount = 0
+	int len = DTSC_SpellsExtraList.GetSize()
+	
+	; v2.30 - added recheck exclusions to modify list on clean phase
+	if (recheckExclusions && !restoreAll && len > 0)
+		CheckExclusionsForList(DTSC_SpellsExtraList)
+		len = DTSC_SpellsExtraList.GetSize() ; update
+	endIf
+	
+	int idx = 0
+	while (idx < len)
+		Spell aSpell = DTSC_SpellsExtraList.GetAt(idx) as Spell
+		if (aSpell)
+			resultCount += ProcessTaskForSpell(taskOption, aSpell)
+			Utility.Wait(0.1)
+		endIf
+		idx += 1
+	endWhile
+	
+	return resultCount
+endFunction
+
+; v2.50 - moved here for re-use
+int Function CleanItems(bool restoreAll, bool ignoreDisabled)
+	int resultCount = 0
+	
+	;  **** single Armor and Book mods *****
+	resultCount = HandleArmorForMod(0x04005901, "Moonlight Tales Special Edition.esp", DTSC_MoonlightTales, restoreAll, ignoreDisabled)
+	
+	resultCount += HandleBookForMod(0x0921D9E1, "Vivid WeathersSE.esp", DTSC_VividWeathers, restoreAll, ignoreDisabled)
+	
+	resultCount += HandleBookForMod(0x0901074F, "OBIS SE.esp", DTSC_OBISmain, restoreAll, ignoreDisabled)
+	resultCount += HandleBookForMod(0x09093562, "OBIS SE Patrols Addon.esp", DTSC_OBISpatrol, restoreAll, ignoreDisabled)
+	resultCount += HandleBookForMod(0x09004E0F, "AcquisitiveSoulGemMultithreaded.esp", DTSC_ASGM, restoreAll, ignoreDisabled)
+	
+	resultCount += HandleBookForMod(0x09006E75, "SOTGenesisMod.esp", DTSC_SOTGenU, restoreAll, ignoreDisabled)
+	resultCount += HandleBookForMod(0x0905BFEC, "Genesis Surface Spawns.esp", DTSC_SOTGenSS, restoreAll, ignoreDisabled)
+	
+	return resultCount
+endFunction 
+
+; v2.50 - moved block here for re-use
+int Function CleanWLOptionals(string pluginName, int taskOption)
+	int resultCount = 0
+	
+	Spell sp = Game.GetFormFromFile(0x06020A40, pluginName) as Spell  ; toggle lantern
+	resultCount += ProcessTaskForSpell(taskOption, sp)
+	sp = Game.GetFormFromFile(0x06020A42, pluginName) as Spell  ; check fuel
+	resultCount += ProcessTaskForSpell(taskOption, sp)
+	
+	return resultCount
+endFunction
+
 Function ConfirmRemoveMenu(FormList list, Form formToRemove, int aiButton = 0)
 	aiButton = DTSC_ConfirmRemoveMsg.Show() 
 	if aiButton == 0  
@@ -600,6 +679,7 @@ int Function HandleArmorForMod(int formId, string modName,  GlobalVariable gVar,
 			return 0
 		endIf
 	endIf
+	Debug.Trace("[DTSC] processing " + modName)
 	int result = 0
 	if (restore)
 		taskOption = 2
@@ -612,7 +692,14 @@ int Function HandleArmorForMod(int formId, string modName,  GlobalVariable gVar,
 	if (taskOption > 0)
 		Armor armorItem = IsPluginPresent(formId, modName) as Armor
 		if (armorItem)
-			result = ProcessTaskForArmor(taskOption, armorItem)
+			
+			if (taskOption == 2 || DTSC_IncludeItemsSetting.GetValueInt() > 0)
+				result = ProcessTaskForArmor(taskOption, armorItem)
+			endIf
+			if (ignoreDisabled)
+				; force for initialize
+				result = 1
+			endIf
 			
 			gVar.SetValue(1.0)
 			Utility.Wait(0.06)
@@ -774,7 +861,9 @@ int Function ProcessTaskForSpell(int taskOption, Spell sp)
 	return 0
 endFunction
 
+; **************************************************
 ; placed here for external use
+;
 Function RecoverCustomArmors()
 	int len = DTSC_ArmorsExtraList.GetSize()
 	int idx = 0
@@ -789,7 +878,6 @@ Function RecoverCustomArmors()
 	endIf
 EndFunction
 
-; for external use
 Function RecoverCustomSpells()
 	int len = DTSC_SpellsExtraList.GetSize()
 	int idx = 0
@@ -804,6 +892,83 @@ Function RecoverCustomSpells()
 		DTSC_HasItemsCustom.SetValueInt(0)
 	endIf
 EndFunction
+
+Function RequestCleanCustoms()
+	if (DTSC_InitOptions.GetValueInt() <= 0)
+		return
+	endIf
+	if (updateType == 2)
+		updateType = 3
+		RegisterForSingleUpdate(2.4)
+	endIf
+endFunction
+
+Function RequestCleanItems()
+	if (DTSC_InitOptions.GetValueInt() <= 0)
+		return
+	endIf
+	if (updateType == 2)
+		if (DTSC_IncludeItemsSetting.GetValueInt() >= 1)
+			CleanItems(false, false)
+		else
+			CleanItems(true, false)
+		endIf
+	endIf
+endFunction
+
+Function RequestCleanINeed()
+	if (DTSC_InitOptions.GetValueInt() <= 0)
+		return
+	endIf
+	if (updateType == 2)
+		Spell actionSpell = IsPluginPresent(0x09056CC4, "iNeed.esp") as Spell
+		if (actionSpell)
+			if (DTSC_iNeedSetting.GetValueInt() >= 1)
+				ProcessTaskForSpell(1, actionSpell)
+			else
+				ProcessTaskForSpell(2, actionSpell)
+			endIf
+		endIf
+	endIf
+endFunction
+
+Function RequestCleanWLOption()
+	if (DTSC_InitOptions.GetValueInt() <= 0)
+		return
+	endIf
+	if (updateType == 2)
+		if (DTSC_WLToggleSetting.GetValue() >= 1)
+			CleanWLOptionals("Chesko_WearableLantern.esp", 1)
+		else
+			CleanWLOptionals("Chesko_WearableLantern.esp", 2)
+		endIf
+	endIf
+endFunction
+
+Function RequestReset()
+	if (DTSC_InitOptions.GetValueInt() <= 0)
+		return
+	endIf
+	if (DTSC_DisableSetting.GetValueInt() > 0)
+		; do we need to restore?
+		if (CleanTaskOption != 2 && updateType >= 1)
+			CleanTaskOption = 2
+			updateType = 0
+			RegisterForSingleUpdate(2.0)
+		
+		endIf
+	else
+		; enabled - do we need to clean?
+		if (updateType == 2)
+			CleanTaskOption = 1
+			updateType == 0
+			RegisterForSingleUpdate(3.0)
+		endIf
+	endIf
+EndFunction
+
+
+
 
 ; **************** no longer used *******************
 
