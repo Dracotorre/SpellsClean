@@ -337,17 +337,23 @@ endFunction
 
 bool Function CheckSkyUI()
 
-	IsSkyUIPresent = IsPluginPresent(0x01000814, "SkyUI_SE.esp") as bool
-	
-	if (IsSkyUIPresent)
-		if (DTSC_SkyUIConfigQuest.IsRunning() == false)
-			DTSC_SkyUIConfigQuest.Start()
-			DTSC_MCMSetting.SetValueInt(1)
-			DTSC_CaptureLimitSetting.SetValueInt(64)
+	if (DTSC_IsXB1.GetValueInt() < 1)
+		IsSkyUIPresent = IsPluginPresent(0x01000814, "SkyUI_SE.esp") as bool
+		if (!IsSkyUIPresent)
+			; check old
+			IsSkyUIPresent = IsPluginPresent(0x01000814, "SkyUI.esp") as bool
 		endIf
-	else
-		DTSC_CaptureLimitSetting.SetValueInt(12)
-		DTSC_MCMSetting.SetValueInt(0)
+		
+		if (IsSkyUIPresent)
+			if (DTSC_SkyUIConfigQuest.IsRunning() == false)
+				DTSC_SkyUIConfigQuest.Start()
+				DTSC_MCMSetting.SetValueInt(1)
+				DTSC_CaptureLimitSetting.SetValueInt(64)
+			endIf
+		else
+			DTSC_CaptureLimitSetting.SetValueInt(12)
+			DTSC_MCMSetting.SetValueInt(0)
+		endIf
 	endIf
 	
 	return IsSkyUIPresent
