@@ -635,8 +635,12 @@ int Function CleanItems(bool restoreAll, bool ignoreDisabled)
 	
 	resultCount += HandleBookForMod(0x0921D9E1, "Vivid WeathersSE.esp", DTSC_VividWeathers, restoreAll, ignoreDisabled)
 	
-	resultCount += HandleBookForMod(0x0901074F, "OBIS SE.esp", DTSC_OBISmain, restoreAll, ignoreDisabled)
-	resultCount += HandleBookForMod(0x09093562, "OBIS SE Patrols Addon.esp", DTSC_OBISpatrol, restoreAll, ignoreDisabled)
+	; OBIS menu disabled if not in inventory due to forced reference
+	if (restoreAll && DTSC_OBISmain.GetValue() > 0.0)
+		resultCount += HandleBookForMod(0x0901074F, "OBIS SE.esp", DTSC_OBISmain, restoreAll, ignoreDisabled)
+		resultCount += HandleBookForMod(0x09093562, "OBIS SE Patrols Addon.esp", DTSC_OBISpatrol, restoreAll, ignoreDisabled)
+		DTSC_OBISmain.SetValue(0.0)
+	endIf
 	resultCount += HandleBookForMod(0x09004E0F, "AcquisitiveSoulGemMultithreaded.esp", DTSC_ASGM, restoreAll, ignoreDisabled)
 	
 	resultCount += HandleBookForMod(0x09006E75, "SOTGenesisMod.esp", DTSC_SOTGenU, restoreAll, ignoreDisabled)
